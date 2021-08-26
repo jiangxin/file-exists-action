@@ -1,0 +1,61 @@
+name: Test file-exists-action
+
+on: [push, pull_request_target]
+
+jobs:
+  check-file-exists:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: '1'
+    - uses: ./
+      name: Check file in default branch
+      id: expect-in-default-branch
+      with:
+        path: .github/workflows/main.yml
+    - name: Verify expect-in-default-branch
+      run: |
+        if ! ${{ steps.expect-in-default-branch.outputs.exists }}
+        then
+          echo >&2 "ERROR: file should in default branch"
+          exit 1
+        fi
+    - uses: ./
+      name: Check non-exist file in default branch
+      id: not-expect-in-default-branch
+      with:
+        path: non-exists-file
+    - name: Verify not-expect-in-default-branch
+      run: |
+        if ${{ steps.not-expect-in-default-branch.outputs.exists }}
+        then
+          echo >&2 "ERROR: file should not in default branch"
+          exit 1
+        fi
+    - uses: ./
+      name: Check file in a specific branch
+      id: expect-in-branch
+      with:
+        path: .github/workflows/main.yml
+        ref: main
+    - name: Verify expect-in-branch
+      run: |
+        if ! ${{ steps.expect-in-branch.outputs.exists }}
+        then
+          echo >&2 "ERROR: file should exist in main branch"
+          exit 1
+        fi
+    - uses: ./
+      name: Check file not in a missing branch
+      id: not-expect-in-missing-branch
+      with:
+        path: .github/workflows/main.yml
+        ref: missing-branch
+    - name: Verify not-expect-in-missing-branch
+      run: |
+        if ${{ steps.not-expect-in-missing-branch.outputs.exists }}
+        then
+          echo >&2 "ERROR: file should not exist in a missing branch"
+          exit 1
+        fi

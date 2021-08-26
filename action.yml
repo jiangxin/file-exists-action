@@ -1,0 +1,71 @@
+name: File exists action
+description: Check file existence in a branch using GitHub API
+inputs:
+  repository:
+    description: Repository name with owner. For example, jiangxin/file-exists-action
+    required: false
+    default: ${{ github.repository }}
+  ref:
+    description: The branch, tag or SHA to search the file path
+    required: false
+    default: ""
+  path:
+    description: File path to find in the repository
+    required: true
+  type:
+    description: Expected type of file in the repository
+    required: false
+    default: file
+  token:
+    description: Personal access token (PAT) used to access GitHub API
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  exists:
+    description: Return true or false for the existence of the file in repository
+    value: ${{ steps.github-api.outputs.exists }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install requirements
+      shell: bash
+      run: |
+        args=
+        for app in curl jq
+        do
+          if ! type $app
+          then
+            args="$args $app"
+          fi
+        done
+        if test "$args" != ""
+        then
+          sudo apt-get update
+          sudo apt-get install $args
+        fi
+    - name: Call GitHub API
+      id: github-api
+      shell: bash
+      run: |
+        url="$GITHUB_API_URL/repos/${{ inputs.repository }}/contents/${{ inputs.path }}"
+        if test "${{ inputs.ref }}" != ""
+        then
+          url="$url?ref=${{ inputs.ref }}"
+        fi
+        exists=false
+        resp="$(curl \
+                  --header "Content-Type: application/json" \
+                  --header "Accept: application/vnd.github.v3+json" \
+                  --header "Authorization: Bearer ${{ inputs.token }}" \
+                  "$url" |
+                  jq ".type")"
+        eval "resp=$resp"
+        echo "::debug::URL: $url"
+        echo "::debug::Response: $resp"
+        if test "$resp" = "${{ inputs.type }}"
+        then
+          exists=true
+        fi
+        echo "::set-output name=exists::$exists"
