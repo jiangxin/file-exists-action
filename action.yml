@@ -1,4 +1,5 @@
 name: File exists action
+author: Jiang Xin
 description: Check file existence in a branch using GitHub API
 inputs:
   repository:
@@ -69,3 +70,7 @@ runs:
           exists=true
         fi
         echo "::set-output name=exists::$exists"
+
+branding:
+  icon: 'search'  
+  color: 'blue'
