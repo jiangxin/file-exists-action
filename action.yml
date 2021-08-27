@@ -25,29 +25,13 @@ inputs:
 outputs:
   exists:
     description: Return true or false for the existence of the file in repository
-    value: ${{ steps.github-api.outputs.exists }}
+    value: ${{ steps.parse-api.outputs.exists }}
 
 runs:
   using: "composite"
   steps:
-    - name: Install requirements
-      shell: bash
-      run: |
-        args=
-        for app in curl jq
-        do
-          if ! type $app
-          then
-            args="$args $app"
-          fi
-        done
-        if test "$args" != ""
-        then
-          sudo apt-get update
-          sudo apt-get install $args
-        fi
     - name: Call GitHub API
-      id: github-api
+      id: call-api
       shell: bash
       run: |
         url="$GITHUB_API_URL/repos/${{ inputs.repository }}/contents/${{ inputs.path }}"
@@ -55,17 +39,27 @@ runs:
         then
           url="$url?ref=${{ inputs.ref }}"
         fi
+        resp=$(curl \
+                --header "Content-Type: application/json" \
+                --header "Accept: application/vnd.github.v3+json" \
+                --header "Authorization: Bearer ${{ inputs.token }}" \
+                "$url")
+        # the following lines are only required for multi line json
+        resp="${resp//'%'/'%25'}"
+        resp="${resp//$'\n'/'%0A'}"
+        resp="${resp//$'\r'/'%0D'}"
+        # end of optional handling for multi line json
+        echo "::set-output name=response::$resp"
+
+    - name: Parse API result
+      id: parse-api
+      shell: bash
+      run: |
         exists=false
-        resp="$(curl \
-                  --header "Content-Type: application/json" \
-                  --header "Accept: application/vnd.github.v3+json" \
-                  --header "Authorization: Bearer ${{ inputs.token }}" \
-                  "$url" |
-                  jq ".type")"
-        eval "resp=$resp"
+        type="${{ fromJSON(steps.call-api.outputs.response)['type'] }}"
         echo "::debug::URL: $url"
-        echo "::debug::Response: $resp"
-        if test "$resp" = "${{ inputs.type }}"
+        echo "::debug::Type: $type"
+        if test "$type" = "${{ inputs.type }}"
         then
           exists=true
         fi
